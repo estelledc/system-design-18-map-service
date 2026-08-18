@@ -66,6 +66,7 @@ for (const path of expected) {
 const packageJson = JSON.parse(await readFile(new URL('package.json', root), 'utf8'));
 assert.deepEqual(packageJson.dependencies, { pg: '8.23.0' });
 assert.equal(packageJson.engines.node, '>=22');
+assert.equal(packageJson.repository.url, 'git+https://github.com/estelledc/system-design-18-map-service.git');
 for (const script of ['lint', 'test', 'test:infra', 'smoke:infra', 'benchmark:infra', 'audit', 'check', 'check:ci']) {
   assert.equal(typeof packageJson.scripts[script], 'string', `missing package script: ${script}`);
 }

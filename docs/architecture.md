@@ -39,7 +39,7 @@ or remote durability.
 
 PostgreSQL stores:
 
-- build intent/phase and artifact metadata;
+- build intent/phase, artifact metadata, and canonical node membership used to reject unknown endpoints before route acceptance;
 - singleton `state_revision`, current build, and current overlay pointers;
 - publication/rollback history and stable state-mutation receipts;
 - immutable overlay temporal metadata;

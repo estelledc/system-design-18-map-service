@@ -20,7 +20,11 @@ the fixed secondary chapter.
 - bounded deterministic Dijkstra with post-checks and exhaustive small-graph oracle tests;
 - pure, real-PostgreSQL, true-process SIGKILL, bounded benchmark, repository-policy, dependency-audit, and Node 22/24/26 CI gates.
 
-Public CI receipts are still pending the first implementation commit and are not claimed yet.
+Implementation commit `11b0b22143e9f9946951bd60098af5ea71922127` passed the complete public Node 22/24/26 matrix in
+[CI run 32190734084](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190734084). Each runtime ran 13
+pure tests and 11 real PostgreSQL 17 tests with zero failures/skips, then the true-process smoke, bounded benchmark, and
+high-severity dependency audit. Exact receipts, two retained red runs, and limits are in
+[docs/verification.md](docs/verification.md).
 
 ## Read the system
 
@@ -49,10 +53,11 @@ runtime variables, crash hooks, and failure interpretation.
 
 ## Evidence boundary
 
-The intended vertical slice may eventually prove synthetic dataset lineage, complete-before-publish generation changes, coherent
-tile/feature or graph-version reads, bounded routing correctness against a direct oracle, cache/version separation, retry behavior,
-and process recovery. It must not call those facts source accuracy, legal map-data rights, client receipt, map rendering, GPS truth,
-turn-by-turn guidance, physical travel, arrival, accessibility, safety, production deployment, or external acceptance.
+For its recorded commit and matching green gates, this vertical slice proves synthetic artifact identity,
+complete-before-current publication, coherent graph/overlay route snapshots, bounded routing against a direct small-graph oracle,
+cache/version separation, stable replay, and the tested process-recovery windows. It must not call those facts source accuracy,
+legal map-data rights, CDN/client receipt, map rendering, GPS truth, turn-by-turn guidance, physical travel, arrival, accessibility,
+safety, production deployment, or external acceptance.
 
 ## License
 

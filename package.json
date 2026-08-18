@@ -31,5 +31,13 @@
     "routing",
     "postgresql"
   ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/estelledc/system-design-18-map-service.git"
+  },
+  "bugs": {
+    "url": "https://github.com/estelledc/system-design-18-map-service/issues"
+  },
+  "homepage": "https://github.com/estelledc/system-design-18-map-service#readme",
   "license": "MIT"
 }

@@ -2,9 +2,50 @@
 
 ## Status
 
-The implementation and verification design exist locally. Public Node 22/24/26 PostgreSQL 17 receipts are pending the first
-implementation commit and GitHub Actions run. This document must be updated with the exact commit, run URL/ID, test counts,
-service/runtime versions, benchmark observations, and any failed/red runs before v0.1 is called complete.
+Implementation commit `11b0b22143e9f9946951bd60098af5ea71922127` passed the complete public matrix in
+[GitHub Actions run 32190734084](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190734084).
+
+Each Node 22/24/26 job used PostgreSQL 17.11 and completed:
+
+- 13 pure tests, 13 passed, 0 failed/skipped/cancelled/todo;
+- 11 real PostgreSQL tests, 11 passed, 0 failed/skipped/cancelled/todo;
+- repository-policy/syntax/link/workflow-pin checks;
+- npm high-severity audit with 0 reported vulnerabilities;
+- one true-process recovery sequence with three separate SIGKILL windows;
+- one bounded generated-fixture benchmark.
+
+Implementation evidence remains bound to the implementation commit above rather than silently moving with later prose-only
+changes. A later all-green documentation run can prove repository consistency for that later commit, not retroactively change the
+implementation observations.
+
+## Public receipts
+
+### Final implementation gate
+
+- Commit: `11b0b22143e9f9946951bd60098af5ea71922127`
+- Run: [32190734084](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190734084)
+- Jobs: Node 22, 24, and 26 with PostgreSQL 17.11, all green
+- Pure/infra per job: 13/11, all pass, zero skip/fail
+- Smoke per job: two complete builds, one complete frozen route, two publications, final revision 3
+- Smoke assertions: partial build recovered; publish response loss replayed; route response loss replayed after a newer generation;
+  old immutable artifact retained byte/ETag identity
+
+### Retained red runs
+
+- Initial implementation `e2e86fce19c8abb68f1c78d5a7fc3261823406d7` failed
+  [run 32190140854](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190140854). PostgreSQL rejected the
+  NUL separator passed to the advisory-lock text hash (`22021`). Pure tests passed; only 1/10 infrastructure tests reached green.
+- Fix `ae346125020f043acbe7b73e1f3d13666beaf2fa` failed
+  [run 32190252294](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190252294). The NUL defect was gone and
+  8/10 infrastructure tests passed, but PostgreSQL rejected one overlay timestamp parameter inferred as both interval and
+  `timestamptz` (`42P08`).
+- Fix `8dc7fbf94bc813faad56a53bfe36440f83bd2240` passed
+  [run 32190365067](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190365067) across all three runtimes.
+  The later `11b0b22...` hardening split state-row locking from immutable metadata resolution and added pre-accept endpoint
+  membership; its 11-test infrastructure gate is the authoritative implementation receipt.
+
+The failures are evidence that the real PostgreSQL gate found behavior pure tests could not prove. They are not flaky runs and are
+not erased from the history.
 
 ## Gate map
 
@@ -37,6 +78,7 @@ service/runtime versions, benchmark observations, and any failed/red runs before
 - active overlay changes synthetic route cost; publishing a new graph clears current overlay while the old route replays exactly;
 - future overlay fails `require_current` and records explicit base fallback when allowed;
 - `work_limit` persists as its own receipt;
+- unknown endpoints fail before a stable route receipt is inserted;
 - rollback appends a revision and old tile bytes/digest remain identical;
 - overlay rejects unknown edges and non-current generations.
 
@@ -59,3 +101,18 @@ The bounded benchmark uses one generated 24×24 directed grid, its exact node/ed
 compatible overlay, and 60 persisted routes. It records Node/PostgreSQL versions, artifact count, build wall time, route throughput,
 p50/p95/max per-route wall time, and total expansions. Network, CDN/client rendering, real data/route quality, replication, and
 production extrapolation are excluded.
+
+## Benchmark observations
+
+All observations below came from run 32190734084, PostgreSQL 17.11, the same generated fixture (576 nodes, 2,208 directed edges,
+128 delayed edges, 9 graph/tile artifacts, 1 overlay, 60 persisted routes), and 32,221 total Dijkstra expansions.
+
+| Runtime | Build ms | Routes/s | Route p50 ms | p95 ms | Max ms |
+|---|---:|---:|---:|---:|---:|
+| Node 22.23.2 | 297.801 | 93.343 | 8.212 | 23.425 | 85.768 |
+| Node 24.19.0 | 82.659 | 100.448 | 9.368 | 13.620 | 16.319 |
+| Node 26.7.0 | 81.995 | 107.183 | 8.891 | 12.065 | 16.324 |
+
+These are raw single-run observations, not a runtime ranking. The Node 22 build outlier is retained rather than explained without
+profiling/repetition. Network latency, CDN/client rendering, real map data/route quality, multi-region replication, and production
+extrapolation were excluded.
