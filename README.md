@@ -11,7 +11,9 @@ the fixed secondary chapter.
 ## Current phase
 
 - Closed-book problem contract: [docs/closed-book-contract.md](docs/closed-book-contract.md)
-- Fixed-source comparison, primary-source correction, implementation, and public CI: pending
+- Fixed-source comparison and primary-source corrections: [docs/research-log.md](docs/research-log.md)
+- Selected v0.1 decision: [ADR 0001](docs/adr/0001-immutable-builds-and-frozen-route-snapshots.md)
+- Runnable implementation and public CI: pending
 
 ## Evidence boundary
 
