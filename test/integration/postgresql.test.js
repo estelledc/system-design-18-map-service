@@ -198,6 +198,17 @@ test('work-limit and no-route outcomes are durable receipts', async () => {
   assert.deepEqual(replay.body.result, limited.body.result);
 });
 
+test('unknown endpoints fail before a stable route receipt is accepted', async () => {
+  const built = await build(graphA, 'build-endpoint-01');
+  await publish(built.body.buildId, 0, 'publish-endpoint1');
+  await assert.rejects(service.route({
+    owner,
+    requestKey: 'route-endpoint-01',
+    body: { ...routeRequest, targetNodeId: 'unknown-node' },
+  }), (error) => error.code === 'invalid_request');
+  assert.equal(Number((await pool.query(`SELECT count(*) AS count FROM route_requests`)).rows[0].count), 0);
+});
+
 test('rollback appends a new revision and preserves immutable old tile bytes', async () => {
   const first = await build(graphA, 'build-back-0001');
   await publish(first.body.buildId, 0, 'publish-back-01');

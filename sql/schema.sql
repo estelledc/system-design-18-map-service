@@ -31,6 +31,12 @@ CREATE TABLE IF NOT EXISTS map_artifacts (
   PRIMARY KEY (build_id, logical_key)
 );
 
+CREATE TABLE IF NOT EXISTS map_graph_nodes (
+  build_id uuid NOT NULL REFERENCES map_builds(build_id),
+  node_id text NOT NULL,
+  PRIMARY KEY (build_id, node_id)
+);
+
 CREATE TABLE IF NOT EXISTS traffic_overlays (
   overlay_id uuid PRIMARY KEY,
   build_id uuid NOT NULL REFERENCES map_builds(build_id),

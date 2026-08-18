@@ -87,6 +87,7 @@ for (const contract of [
   "action IN ('publish', 'rollback')",
   "status IN ('accepted', 'complete')",
   "overlay_resolution IN ('current', 'base_fallback')",
+  'CREATE TABLE IF NOT EXISTS map_graph_nodes',
   'UNIQUE (owner_fingerprint, request_key)',
 ]) assert.ok(schema.includes(contract), `missing schema contract: ${contract}`);
 
@@ -94,8 +95,9 @@ const repository = await readFile(new URL('src/repository.js', root), 'utf8');
 for (const contract of [
   'pg_advisory_xact_lock',
   '${owner.length}:${owner}:${requestKey.length}:${requestKey}',
-  'FOR UPDATE OF state',
-  'FOR SHARE OF state',
+  'async #lockStateForUpdate(client)',
+  'async #lockStateForShare(client)',
+  'FROM map_graph_nodes',
   "state = 'complete'",
   'current_overlay_id = NULL',
   "throw precondition('current state revision changed', revision)",

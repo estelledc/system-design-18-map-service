@@ -73,7 +73,7 @@ export async function resetDatabase(pool, confirmation) {
   }
   await pool.query(`
     TRUNCATE route_requests, map_publications, state_mutation_receipts,
-      map_system_state, traffic_overlays, map_artifacts, map_builds CASCADE;
+      map_system_state, traffic_overlays, map_graph_nodes, map_artifacts, map_builds CASCADE;
     INSERT INTO map_system_state (singleton, state_revision)
     VALUES (true, 0);
   `);
@@ -94,6 +94,26 @@ export class MapRepository {
   async #databaseNow(client) {
     const result = await client.query(`SELECT clock_timestamp() AS now`);
     return new Date(result.rows[0].now);
+  }
+
+  async #lockStateForUpdate(client) {
+    const result = await client.query(`
+      SELECT state_revision, current_build_id, current_overlay_id
+      FROM map_system_state
+      WHERE singleton = true
+      FOR UPDATE
+    `);
+    return result.rows[0];
+  }
+
+  async #lockStateForShare(client) {
+    const result = await client.query(`
+      SELECT state_revision, current_build_id, current_overlay_id
+      FROM map_system_state
+      WHERE singleton = true
+      FOR SHARE
+    `);
+    return result.rows[0];
   }
 
   async #existingMutation(client, owner, requestKey, digest) {
@@ -153,7 +173,7 @@ export class MapRepository {
     }
   }
 
-  async completeBuild({ buildId, graphDigest, manifestDigest, artifacts }) {
+  async completeBuild({ buildId, graphDigest, manifestDigest, artifacts, nodeIds }) {
     const client = await this.pool.connect();
     try {
       await client.query('BEGIN');
@@ -173,6 +193,9 @@ export class MapRepository {
       if (!artifacts.length || !artifacts.some((artifact) => artifact.kind === 'graph' && artifact.digest === graphDigest)) {
         throw invalid('a complete build requires its graph artifact');
       }
+      if (!Array.isArray(nodeIds) || nodeIds.length < 2 || new Set(nodeIds).size !== nodeIds.length) {
+        throw invalid('a complete build requires unique graph node metadata');
+      }
       for (const artifact of artifacts) {
         await client.query(`
           INSERT INTO map_artifacts (
@@ -188,6 +211,11 @@ export class MapRepository {
           artifact.mediaType,
         ]);
       }
+      await client.query(`
+        INSERT INTO map_graph_nodes (build_id, node_id)
+        SELECT $1, node_id
+        FROM unnest($2::text[]) AS value(node_id)
+      `, [buildId, nodeIds]);
       const now = await this.#databaseNow(client);
       const updated = await client.query(`
         UPDATE map_builds
@@ -253,16 +281,14 @@ export class MapRepository {
         await client.query('COMMIT');
         return replay;
       }
-      const stateResult = await client.query(`
-        SELECT state.state_revision, state.current_build_id, current_build.generation AS current_generation
-        FROM map_system_state AS state
-        LEFT JOIN map_builds AS current_build ON current_build.build_id = state.current_build_id
-        WHERE state.singleton = true
-        FOR UPDATE OF state
-      `);
-      const state = stateResult.rows[0];
+      const state = await this.#lockStateForUpdate(client);
       const revision = integer(state.state_revision);
       if (revision !== expectedRevision) throw precondition('current state revision changed', revision);
+      let currentGeneration = null;
+      if (state.current_build_id) {
+        const current = await client.query(`SELECT generation FROM map_builds WHERE build_id = $1`, [state.current_build_id]);
+        currentGeneration = current.rows[0]?.generation ?? null;
+      }
       const targetResult = await client.query(`SELECT * FROM map_builds WHERE build_id = $1`, [buildId]);
       if (!targetResult.rowCount) throw notFound();
       const target = targetResult.rows[0];
@@ -290,7 +316,7 @@ export class MapRepository {
         buildId,
         generation: target.generation,
         previousBuildId: state.current_build_id,
-        previousGeneration: state.current_generation,
+        previousGeneration: currentGeneration,
       };
       replay = await this.#recordMutation(client, {
         owner, requestKey, digest, operation: action, result, now,
@@ -332,17 +358,12 @@ export class MapRepository {
         await client.query('COMMIT');
         return replay;
       }
-      const stateResult = await client.query(`
-        SELECT state.state_revision, state.current_build_id, build.generation
-        FROM map_system_state AS state
-        LEFT JOIN map_builds AS build ON build.build_id = state.current_build_id
-        WHERE state.singleton = true
-        FOR UPDATE OF state
-      `);
-      const state = stateResult.rows[0];
+      const state = await this.#lockStateForUpdate(client);
       const revision = integer(state.state_revision);
       if (revision !== expectedRevision) throw precondition('current state revision changed', revision);
       if (state.current_build_id !== buildId) throw conflict('overlay generation is not the current map generation');
+      const currentBuild = await client.query(`SELECT generation FROM map_builds WHERE build_id = $1`, [buildId]);
+      if (!currentBuild.rowCount) throw notFound();
       const now = await this.#databaseNow(client);
       const overlayId = randomUUID();
       const inserted = await client.query(`
@@ -377,7 +398,7 @@ export class MapRepository {
         stateRevision: nextRevision,
         overlayId,
         buildId,
-        generation: state.generation,
+        generation: currentBuild.rows[0].generation,
         overlayDigest: overlay.digest,
         acceptedAt: new Date(overlay.accepted_at).toISOString(),
         effectiveAt: new Date(overlay.effective_at).toISOString(),
@@ -413,29 +434,36 @@ export class MapRepository {
         return routeFromRow(existing.rows[0], true);
       }
 
-      const stateResult = await client.query(`
-        SELECT state.state_revision, state.current_build_id, state.current_overlay_id,
-               build.generation, build.graph_digest, build.state AS build_state,
-               overlay.digest AS overlay_digest, overlay.build_id AS overlay_build_id,
-               overlay.effective_at, overlay.expires_at,
-               clock_timestamp() AS accepted_at
-        FROM map_system_state AS state
-        LEFT JOIN map_builds AS build ON build.build_id = state.current_build_id
-        LEFT JOIN traffic_overlays AS overlay ON overlay.overlay_id = state.current_overlay_id
-        WHERE state.singleton = true
-        FOR SHARE OF state
-      `);
-      const state = stateResult.rows[0];
-      if (!state.current_build_id || state.build_state !== 'complete') {
+      const state = await this.#lockStateForShare(client);
+      if (!state.current_build_id) {
         throw conflict('no complete map generation is current');
       }
-      const acceptedAt = new Date(state.accepted_at);
-      const hasCurrentOverlay = Boolean(
-        state.current_overlay_id
-        && state.overlay_build_id === state.current_build_id
-        && new Date(state.effective_at) <= acceptedAt
-        && acceptedAt < new Date(state.expires_at),
-      );
+      const buildResult = await client.query(`SELECT * FROM map_builds WHERE build_id = $1`, [state.current_build_id]);
+      const build = buildResult.rows[0];
+      if (!build || build.state !== 'complete') throw conflict('no complete map generation is current');
+      const endpoints = await client.query(`
+        SELECT node_id
+        FROM map_graph_nodes
+        WHERE build_id = $1 AND node_id = ANY($2::text[])
+      `, [state.current_build_id, [request.sourceNodeId, request.targetNodeId]]);
+      if (endpoints.rowCount !== 2) throw invalid('route endpoint is not present in the current frozen graph');
+      const timingResult = await client.query(`
+        WITH boundary AS (SELECT clock_timestamp() AS accepted_at)
+        SELECT boundary.accepted_at,
+               overlay.overlay_id, overlay.build_id AS overlay_build_id,
+               overlay.digest AS overlay_digest, overlay.effective_at, overlay.expires_at,
+               COALESCE(
+                 overlay.build_id = $2
+                 AND overlay.effective_at <= boundary.accepted_at
+                 AND boundary.accepted_at < overlay.expires_at,
+                 false
+               ) AS effective
+        FROM boundary
+        LEFT JOIN traffic_overlays AS overlay ON overlay.overlay_id = $1
+      `, [state.current_overlay_id, state.current_build_id]);
+      const timing = timingResult.rows[0];
+      const acceptedAt = new Date(timing.accepted_at);
+      const hasCurrentOverlay = timing.effective;
       if (!hasCurrentOverlay && request.overlayPolicy === 'require_current') throw overlayUnavailable();
 
       const routeId = randomUUID();
@@ -460,12 +488,12 @@ export class MapRepository {
         acceptedAt,
         integer(state.state_revision),
         state.current_build_id,
-        state.generation,
-        state.graph_digest,
-        hasCurrentOverlay ? state.current_overlay_id : null,
-        hasCurrentOverlay ? state.overlay_digest : null,
-        hasCurrentOverlay ? state.effective_at : null,
-        hasCurrentOverlay ? state.expires_at : null,
+        build.generation,
+        build.graph_digest,
+        hasCurrentOverlay ? timing.overlay_id : null,
+        hasCurrentOverlay ? timing.overlay_digest : null,
+        hasCurrentOverlay ? timing.effective_at : null,
+        hasCurrentOverlay ? timing.expires_at : null,
         hasCurrentOverlay ? 'current' : 'base_fallback',
         request.sourceNodeId,
         request.targetNodeId,

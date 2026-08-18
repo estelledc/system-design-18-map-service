@@ -110,6 +110,7 @@ export class MapService {
       graphDigest: graphObject.digest,
       manifestDigest: manifestObject.digest,
       artifacts,
+      nodeIds: graph.nodes.map((node) => node.id),
     });
     return { created: true, body: buildBody(build, false) };
   }
