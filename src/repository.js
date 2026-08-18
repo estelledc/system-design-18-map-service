@@ -350,9 +350,9 @@ export class MapRepository {
           overlay_id, build_id, digest, object_key, byte_count,
           accepted_at, effective_at, expires_at
         ) VALUES (
-          $1, $2, $3, $4, $5, $6,
-          $6 + ($7::integer * interval '1 second'),
-          $6 + (($7::integer + $8::integer) * interval '1 second')
+          $1, $2, $3, $4, $5, $6::timestamptz,
+          $6::timestamptz + ($7::integer * interval '1 second'),
+          $6::timestamptz + (($7::integer + $8::integer) * interval '1 second')
         )
         RETURNING *
       `, [
