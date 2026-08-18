@@ -87,7 +87,7 @@ export class MapRepository {
   async #lockIntent(client, owner, requestKey) {
     await client.query(
       `SELECT pg_advisory_xact_lock(hashtextextended($1, 0))`,
-      [`${owner}\0${requestKey}`],
+      [`${owner.length}:${owner}:${requestKey.length}:${requestKey}`],
     );
   }
 

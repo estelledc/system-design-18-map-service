@@ -93,6 +93,7 @@ for (const contract of [
 const repository = await readFile(new URL('src/repository.js', root), 'utf8');
 for (const contract of [
   'pg_advisory_xact_lock',
+  '${owner.length}:${owner}:${requestKey.length}:${requestKey}',
   'FOR UPDATE OF state',
   'FOR SHARE OF state',
   "state = 'complete'",
