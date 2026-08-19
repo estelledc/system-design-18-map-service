@@ -2,8 +2,11 @@
 
 ## Status
 
-Implementation commit `11b0b22143e9f9946951bd60098af5ea71922127` passed the complete public matrix in
-[GitHub Actions run 32190734084](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190734084).
+The identity-safe rewrite preserved every existing tree, message, and timestamp while mapping the seven commits in order: `ea989b9c46867ae9dd7a816a95151c62949a4e13` → `df03595862cf0cff9ac4c94871864bd6295cceb6`, `6ed72002a062b659ac686c4bbfeacc5f0232fb33` → `61b229febb3edd9385e004d69eb788d673af1c17`, `e2e86fce19c8abb68f1c78d5a7fc3261823406d7` → `3e20bbeb6fd28cb5aa4b4a4ce3103e652d08d748`, `ae346125020f043acbe7b73e1f3d13666beaf2fa` → `4eb811c5dbdf367437879ae31e8aa5e016dbcc03`, `8dc7fbf94bc813faad56a53bfe36440f83bd2240` → `e449049009359b62b61b22d80c8fb5190c1ab1df`, `11b0b22143e9f9946951bd60098af5ea71922127` → `53b342a42288a86207b96fcfd7313ccae590b2c6`, and `95dc68675fcce18b0eb202410ef1fa6a36a82da3` → `69b4b724a45398dc7713ddc48209f95e9dcb261e`.
+
+Implementation commit `53b342a42288a86207b96fcfd7313ccae590b2c6` passed the complete tree-equivalent public matrix in historical pre-rewrite [GitHub Actions run 32190734084](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190734084). The run remains bound to the old commit object.
+
+Current reachable `main` uses the repository owner's GitHub noreply identity. Rewritten baseline `69b4b724a45398dc7713ddc48209f95e9dcb261e` passed [CI run 32227079128](https://github.com/estelledc/system-design-18-map-service/actions/runs/32227079128) on Node 22, 24, and 26 with PostgreSQL 17 and the full quality gate.
 
 Each Node 22/24/26 job used PostgreSQL 17.11 and completed:
 
@@ -22,7 +25,7 @@ implementation observations.
 
 ### Final implementation gate
 
-- Commit: `11b0b22143e9f9946951bd60098af5ea71922127`
+- Commit: `53b342a42288a86207b96fcfd7313ccae590b2c6`
 - Run: [32190734084](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190734084)
 - Jobs: Node 22, 24, and 26 with PostgreSQL 17.11, all green
 - Pure/infra per job: 13/11, all pass, zero skip/fail
@@ -32,16 +35,16 @@ implementation observations.
 
 ### Retained red runs
 
-- Initial implementation `e2e86fce19c8abb68f1c78d5a7fc3261823406d7` failed
+- Initial tree-equivalent implementation `3e20bbeb6fd28cb5aa4b4a4ce3103e652d08d748` failed
   [run 32190140854](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190140854). PostgreSQL rejected the
   NUL separator passed to the advisory-lock text hash (`22021`). Pure tests passed; only 1/10 infrastructure tests reached green.
-- Fix `ae346125020f043acbe7b73e1f3d13666beaf2fa` failed
+- Fix `4eb811c5dbdf367437879ae31e8aa5e016dbcc03` failed
   [run 32190252294](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190252294). The NUL defect was gone and
   8/10 infrastructure tests passed, but PostgreSQL rejected one overlay timestamp parameter inferred as both interval and
   `timestamptz` (`42P08`).
-- Fix `8dc7fbf94bc813faad56a53bfe36440f83bd2240` passed
+- Fix `e449049009359b62b61b22d80c8fb5190c1ab1df` passed
   [run 32190365067](https://github.com/estelledc/system-design-18-map-service/actions/runs/32190365067) across all three runtimes.
-  The later `11b0b22...` hardening split state-row locking from immutable metadata resolution and added pre-accept endpoint
+  The later `53b342a...` hardening split state-row locking from immutable metadata resolution and added pre-accept endpoint
   membership; its 11-test infrastructure gate is the authoritative implementation receipt.
 
 The failures are evidence that the real PostgreSQL gate found behavior pure tests could not prove. They are not flaky runs and are
